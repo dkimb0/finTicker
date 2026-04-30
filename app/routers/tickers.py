@@ -39,7 +39,7 @@ def get_ticker_data(
   ensure_prices_for_range(db, ticker, start, end, refresh=refresh)
   
   if not prices_repo.has_prices_for_range(db, ticker, start, end):
-    raise HTTPException(status_code=404, detail=f"No price data found for ticker '{ticker}'")
+    raise HTTPException(status_code=404, detail=f"No price data found for ticker '{ticker}' from {start} to {end}")
   
   ensure_movements_for_range(db, ticker, start, end)
   

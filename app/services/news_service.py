@@ -37,7 +37,7 @@ async def fetch_news_for_movement(
 
   candidates: dict[str, dict] = {}
   for results in results_lists:
-    if isinstance(results, Exception):
+    if isinstance(results, BaseException):
       continue  # silently drop failed queries; log when we add logging
     for r in results:
       candidates.setdefault(r["url"], r)

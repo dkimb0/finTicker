@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.db import init_db
-from app.routers import tickers
+from app.routers import tickers, chat
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,4 +22,4 @@ def health() -> dict[str, str]:
 # Routers (added as we build them)
 # from app.routers import tickers, chat
 app.include_router(tickers.router)
-# app.include_router(chat.router)
+app.include_router(chat.router)

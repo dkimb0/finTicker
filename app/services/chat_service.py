@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from datetime import date as DateType
 from functools import lru_cache
 from typing import Any
@@ -15,6 +16,8 @@ from app.repositories import movements as movements_repo
 from app.repositories import news as news_repo
 from app.repositories import prices as prices_repo
 from app.schemas.chat import ChatMessageIn
+
+logger = logging.getLogger(__name__)
 
 MAX_ITERATIONS = 6
 
@@ -166,6 +169,7 @@ def _execute_tool(name: str, args: dict) -> Any:
       return _tool_search_movements_by_keyword(args)
     return {"error": f"unknown tool: {name}"}
   except Exception as e:
+    logger.exception("Tool '%s' failed with args=%s", name, args)
     return {"error": f"{type(e).__name__}: {e}"}
 
 

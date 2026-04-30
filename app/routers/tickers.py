@@ -1,4 +1,5 @@
-import asyncio
+import logging
+import time
 from datetime import date as DateType, timedelta
 from typing import Annotated, Literal
 
@@ -12,6 +13,8 @@ from app.repositories import news as news_repo
 from app.repositories import prices as prices_repo
 from app.schemas.ticker import DateRange, Filters, MovementOut, NewsOut, TickerDataResponse
 from app.services.ingestion_service import ingest_ticker
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/tickers", tags=["tickers"])
 
@@ -28,6 +31,7 @@ async def get_ticker_data(
   refresh: Annotated[bool, Query(description="Force re-fetch from yfinance")] = False,
 ) -> TickerDataResponse:
   ticker = symbol.upper()
+  t_req = time.perf_counter()
 
   if end is None:
     end = DateType.today()
@@ -38,6 +42,10 @@ async def get_ticker_data(
   if min_pct_change is None:
     min_pct_change = settings.DEFAULT_MIN_PCT
 
+  logger.info(
+    "request GET /tickers/%s range=[%s,%s] min_pct=%s direction=%s include_news=%s refresh=%s",
+    ticker, start, end, min_pct_change, direction, include_news, refresh,
+  )
   await ingest_ticker(ticker, start, end, refresh=refresh, include_news=include_news)
 
   if not prices_repo.has_prices_for_range(db, ticker, start, end):
@@ -76,9 +84,14 @@ async def get_ticker_data(
       )
     )
 
-  return TickerDataResponse(
+  response = TickerDataResponse(
     ticker=ticker,
     range=DateRange(start=start, end=end),
     filters=Filters(min_pct_change=min_pct_change, direction=direction),
     movements=movements_out,
   )
+  logger.info(
+    "response GET /tickers/%s movements=%d total_elapsed=%.2fs",
+    ticker, len(movements_out), time.perf_counter() - t_req,
+  )
+  return response

@@ -30,8 +30,8 @@ class Settings(BaseSettings):
   NEWS_PER_QUERY: int = 10
 
   # llm
-  RELEVANCE_MODEL: str = "gpt-5.4-nano"
-  CHAT_MODEL: str = "gpt-5.4-pro"
+  RELEVANCE_MODEL: str = "gpt-4.1-mini"
+  CHAT_MODEL: str = "gpt-4.1"
   RELEVANCE_THRESHOLD: float = Field(default=0.3, ge=0.0, le=1.0)
 
   # caching

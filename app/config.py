@@ -22,6 +22,7 @@ class Settings(BaseSettings):
   # ingestion defaults (overridable per-request via query params)
   DEFAULT_HISTORY_DAYS: int = 90
   DEFAULT_MIN_PCT: float = 2.0
+  MOVEMENT_LOOKBACK_DAYS: int = 5
 
   # news fetching
   NEWS_BUFFER_BEFORE_DAYS: int = 2

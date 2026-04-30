@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import time
 from datetime import date as DateType
 from typing import Any
 
@@ -12,6 +14,8 @@ from app.services.prices_service import ensure_prices_for_range
 from app.services.relevance_service import score_articles
 from app.services.ticker_profile_service import ensure_profile
 
+logger = logging.getLogger(__name__)
+
 
 async def ingest_ticker(
   ticker: str,
@@ -22,17 +26,45 @@ async def ingest_ticker(
 ) -> dict[str, Any]:
   """Full pipeline. Idempotent — already-analyzed movements are skipped."""
   ticker = ticker.upper()
+  t_start = time.perf_counter()
+  logger.info(
+    "ingest start ticker=%s range=[%s,%s] refresh=%s include_news=%s",
+    ticker, start, end, refresh, include_news,
+  )
 
+  t0 = time.perf_counter()
   counts = await asyncio.to_thread(_sync_prices_and_movements, ticker, start, end, refresh)
+  logger.info(
+    "ingest phase=prices+movements ticker=%s prices_inserted=%d movements_detected=%d elapsed=%.2fs",
+    ticker, counts["prices_inserted"], counts["movements_detected"], time.perf_counter() - t0,
+  )
 
   if not include_news:
+    logger.info(
+      "ingest done ticker=%s news=skipped total_elapsed=%.2fs",
+      ticker, time.perf_counter() - t_start,
+    )
     return {**counts, "movements_analyzed": 0, "movements_failed": 0}
 
+  t0 = time.perf_counter()
   profile_data, pending = await asyncio.to_thread(_load_profile_and_pending, ticker, start, end)
+  logger.info(
+    "ingest phase=profile+pending ticker=%s pending_movements=%d sensitivities=%d elapsed=%.2fs",
+    ticker, len(pending), len(profile_data["macro_sensitivities"]), time.perf_counter() - t0,
+  )
 
   if not pending:
+    logger.info(
+      "ingest done ticker=%s no_pending_movements total_elapsed=%.2fs",
+      ticker, time.perf_counter() - t_start,
+    )
     return {**counts, "movements_analyzed": 0, "movements_failed": 0}
 
+  logger.info(
+    "ingest phase=news+score ticker=%s movements=%d concurrency=%d",
+    ticker, len(pending), settings.INGEST_CONCURRENCY,
+  )
+  t0 = time.perf_counter()
   sem = asyncio.Semaphore(settings.INGEST_CONCURRENCY)
   results = await asyncio.gather(
     *[_process_movement(ticker, profile_data, m, sem) for m in pending],
@@ -41,6 +73,10 @@ async def ingest_ticker(
 
   analyzed = sum(1 for r in results if r is True)
   failed = len(results) - analyzed
+  logger.info(
+    "ingest done ticker=%s analyzed=%d failed=%d phase_elapsed=%.2fs total_elapsed=%.2fs",
+    ticker, analyzed, failed, time.perf_counter() - t0, time.perf_counter() - t_start,
+  )
   return {**counts, "movements_analyzed": analyzed, "movements_failed": failed}
 
 
@@ -85,29 +121,47 @@ async def _process_movement(
   sem: asyncio.Semaphore,
 ) -> bool:
   """Per-movement: fetch + score (async) → persist (sync, own session). Returns success bool."""
+  mid = movement["id"]
+  mdate = movement["date"]
   async with sem:
     try:
+      t0 = time.perf_counter()
       candidates = await fetch_news_for_movement(
         ticker=ticker,
         company_name=profile_data["company_name"],
         sector=profile_data["sector"],
         macro_sensitivities=profile_data["macro_sensitivities"],
-        movement_date=movement["date"],
+        movement_date=mdate,
       )
+      t_fetch = time.perf_counter() - t0
+      logger.info(
+        "movement id=%s date=%s fetched=%d elapsed=%.2fs",
+        mid, mdate, len(candidates), t_fetch,
+      )
+
+      t0 = time.perf_counter()
       scored = await score_articles(
         ticker=ticker,
         company_name=profile_data["company_name"],
         sector=profile_data["sector"],
-        movement_date=movement["date"].isoformat(),
+        movement_date=mdate.isoformat(),
         pct_change=movement["pct_change"],
         direction=movement["direction"],
         candidates=candidates,
       )
+      t_score = time.perf_counter() - t0
+      logger.info(
+        "movement id=%s date=%s scored=%d (above threshold) elapsed=%.2fs",
+        mid, mdate, len(scored), t_score,
+      )
 
-      await asyncio.to_thread(_persist_scored, movement["id"], candidates, scored)
+      await asyncio.to_thread(_persist_scored, mid, candidates, scored)
       return True
     except Exception:
-      # Movement stays 'pending' for retry on next ingest. Add real logging when we have it.
+      logger.exception(
+        "Failed to process movement id=%s ticker=%s date=%s",
+        mid, ticker, mdate,
+      )
       return False
 
 

@@ -30,10 +30,10 @@ def fetch_prices(ticker: str, start: DateType, end: DateType) -> list[dict[str, 
       {
         "ticker": ticker,
         "date": pd.Timestamp(ts).date(),
-        "open": float(row["Open"]),
-        "high": float(row["High"]),
-        "low": float(row["Low"]),
-        "close": float(row["Close"]),
+        "open": round(float(row["Open"]), 2),
+        "high": round(float(row["High"]), 2),
+        "low": round(float(row["Low"]), 2),
+        "close": round(float(row["Close"]), 2),
         "volume": int(row["Volume"]),
       }
     )

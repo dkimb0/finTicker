@@ -20,7 +20,7 @@ class Settings(BaseSettings):
   DATABASE_URL: str = "sqlite:///./app.db"
 
   # ingestion defaults (overridable per-request via query params)
-  DEFAULT_HISTORY_DAYS: int = 90
+  DEFAULT_HISTORY_DAYS: int = 14
   DEFAULT_MIN_PCT: float = 2.0
   MOVEMENT_LOOKBACK_DAYS: int = 5
 

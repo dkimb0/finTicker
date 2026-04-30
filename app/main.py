@@ -1,7 +1,13 @@
 from contextlib import asynccontextmanager
+import logging
 from fastapi import FastAPI
 from app.db import init_db
 from app.routers import tickers, chat
+
+logging.basicConfig(
+  level=logging.INFO,
+  format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

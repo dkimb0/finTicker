@@ -26,7 +26,7 @@ async def fetch_news_for_movement(
   end = movement_date + timedelta(days=settings.NEWS_BUFFER_AFTER_DAYS)
 
   queries: list[tuple[str, str]] = [("company", f"{company_name} ({ticker}) news")]
-  for topic in macro_sensitivities[:5]:
+  for topic in macro_sensitivities[:3]:
     label = f"{sector}: {topic}" if sector else topic
     queries.append(("macro", label))
 

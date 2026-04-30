@@ -1,13 +1,48 @@
-import os
-from dotenv import load_dotenv
+from functools import lru_cache
 
-load_dotenv()
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-EXA_API_KEY = os.getenv("EXA_API_KEY")
-if not OPENAI_API_KEY:
-  raise RuntimeError("OPENAI_API_KEY is missing")
-if not EXA_API_KEY:
-  raise RuntimeError("EXA_API_KEY is missing")
 
-DATABASE_URL = os.getenv("DATABASE_URL", 'sqlite:///./app.db')
+class Settings(BaseSettings):
+  model_config = SettingsConfigDict(
+    env_file=".env",
+    env_file_encoding="utf-8",
+    case_sensitive=True,
+    extra="ignore",
+  )
+
+  # secrets — required, no default
+  OPENAI_API_KEY: str = Field(default="", min_length=1)
+  EXA_API_KEY: str = Field(default="", min_length=1)
+
+  # storage
+  DATABASE_URL: str = "sqlite:///./app.db"
+
+  # ingestion defaults (overridable per-request via query params)
+  DEFAULT_HISTORY_DAYS: int = 90
+  DEFAULT_MIN_PCT: float = 2.0
+
+  # news fetching
+  NEWS_BUFFER_BEFORE_DAYS: int = 2
+  NEWS_BUFFER_AFTER_DAYS: int = 1
+  NEWS_PER_QUERY: int = 10
+
+  # llm
+  RELEVANCE_MODEL: str = "gpt-5.4-nano"
+  CHAT_MODEL: str = "gpt-5.4-pro"
+  RELEVANCE_THRESHOLD: float = Field(default=0.3, ge=0.0, le=1.0)
+
+  # caching
+  TICKER_PROFILE_TTL_DAYS: int = 30
+
+  # concurrency
+  INGEST_CONCURRENCY: int = Field(default=5, ge=1, le=20)
+
+
+@lru_cache
+def get_settings() -> Settings:
+  return Settings()
+
+
+settings = get_settings()

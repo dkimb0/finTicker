@@ -1,40 +1,28 @@
-import sqlite3
-from pathlib import Path
+from collections.abc import Generator
 
-DB_PATH = Path("app.db")
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-def get_connection() -> sqlite3.Connection:
-  conn = sqlite3.connect(DB_PATH)
-  conn.row_factory =sqlite3.Row
-  return conn
+from app.config import settings
 
-def init_db() -> None:
-  with get_connection() as conn:
-    conn.execute("""
-      CREATE TABLE IF NOT EXISTS batches (
-        id TEXT PRIMARY KEY,
-        status TEXT NOT NULL,
-        total_documents INTEGER NOT NULL,
-        completed_documents INTEGER DEFAULT 0,
-        failed_documents INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-      )           
-    """
-    )
+connect_args = {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
+
+engine = create_engine(settings.DATABASE_URL, connect_args=connect_args, future=True)
+
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
+
+class Base(DeclarativeBase):
+  pass
+
+def get_db() -> Generator[Session, None, None]:
+  db = SessionLocal()
+  try:
+    yield db
+  finally:
+    db.close()
     
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS documents (
-      id TEXT PRIMARY KEY,
-      batch_id TEXT,
-      filename TEXT,
-      status TEXT NOT NULL,
-      ocr_text TEXT,
-      analysis TEXT,
-      error TEXT,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(batch_id) REFERENCES batches(id)
-      )
-    """)
-    conn.commit()
+    
+def init_db() -> None:
+  from app import models
+  
+  Base.metadata.create_all(bind=engine)
